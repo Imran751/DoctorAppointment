@@ -1,85 +1,81 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { TextInput, Button, Text, ActivityIndicator } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
-import useAuthStore from '../store/useAuthStore';
+import React, { useState } from 'react';
+import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
+import { usePatientStore } from '../store/patientStore';
 
-export default function LoginScreen() {
-  const navigation = useNavigation();
+export default function LoginScreen({ navigation }) {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState(null); // 👈 error state
+  const { loginPatient } = usePatientStore();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  // ✅ Extract correct values from Zustand
-  const { login, loading, error, token } = useAuthStore();
-
-  const handleLogin = async () => {
-    if (!email || !password) return;
-    await login(email, password);
+  const handleChange = (key, value) => {
+    setForm({ ...form, [key]: value });
+    setError(null); // Clear error as user types
   };
 
-  // ✅ Navigate after successful login
-  useEffect(() => {
-    if (token) {
-      navigation.replace('PatientTabs'); // Later: check user role here
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (!form.email || !form.password) {
+      setError('Email and password are required.');
+      return;
     }
-  }, [token]);
+
+    try {
+      await loginPatient(form);
+      navigation.replace('HomeScreen');
+    } catch (err) {
+      console.error('Login failed:', err);
+
+      // Try to extract readable error message
+      if (err?.response?.status === 401) {
+        setError('Invalid email or password.');
+      } else {
+        setError('Login failed. Please try again later.');
+      }
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <Icon name="doctor" size={60} color="#6200ee" style={styles.icon} />
-      <Text style={styles.title}>Welcome!</Text>
+      <Text style={styles.title}>Patient Login</Text>
 
-      <TextInput
-        label="Email"
-        mode="outlined"
-        value={email}
-        onChangeText={setEmail}
-        left={<TextInput.Icon icon="email" />}
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+      {['email', 'password'].map((key) => (
+        <TextInput
+          key={key}
+          style={styles.input}
+          placeholder={key.charAt(0).toUpperCase() + key.slice(1)}
+          value={form[key]}
+          secureTextEntry={key === 'password'}
+          onChangeText={(val) => handleChange(key, val)}
+          autoCapitalize="none"
+          keyboardType={key === 'email' ? 'email-address' : 'default'}
+        />
+      ))}
 
-      <TextInput
-        label="Password"
-        mode="outlined"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        left={<TextInput.Icon icon="lock" />}
-        style={styles.input}
-      />
+      {error && <Text style={styles.error}>{error}</Text>}
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      <Button title="Login" onPress={handleSubmit} />
 
-      <Button
-        mode="contained"
-        onPress={handleLogin}
-        loading={loading}
-        disabled={loading}
-        style={styles.button}
-      >
-        Login
-      </Button>
-
-      <Text
-        onPress={() => navigation.navigate('Register')}
-        style={styles.link}
-      >
-        Don't have an account? Register
-      </Text>
+      <Text style={{ textAlign: 'center', marginVertical: 10 }}>New user?</Text>
+      <Button title="Go to Register" onPress={() => navigation.replace('Register')} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  icon: { alignSelf: 'center', marginBottom: 10 },
-  title: { fontSize: 24, textAlign: 'center', marginBottom: 20 },
-  input: { marginBottom: 15 },
-  button: { marginTop: 10 },
-  link: { marginTop: 20, textAlign: 'center', color: '#6200ee' },
-  errorText: { color: 'red', textAlign: 'center', marginBottom: 10 },
+  container: { padding: 20, marginTop: 50 },
+  input: {
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 8,
+    borderRadius: 5,
+    borderColor: '#ccc',
+  },
+  title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
+  error: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
 });

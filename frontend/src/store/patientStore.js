@@ -33,6 +33,28 @@ export const usePatientStore = create((set) => ({
     }
   },
 
+  loginPatient: async ({ email, password }) => {
+  const res = await axios.post(`${API_BASE_URL}/login`, { email, password });
+
+  const { token, patient_id, name, phone, address } = res.data;
+
+  await AsyncStorage.setItem('patient_token', token);
+  await AsyncStorage.setItem('patient_id', patient_id);
+
+  const patientData = { name, email, phone, address };
+
+  // Optionally store all patient data in AsyncStorage
+  await AsyncStorage.setItem('patient_data', JSON.stringify(patientData));
+
+  set({
+    patientId: patient_id,
+    isRegistered: true,
+    patientData,
+  });
+},
+
+
+
   loadSession: async () => {
     try {
       const id = await AsyncStorage.getItem('patient_id');

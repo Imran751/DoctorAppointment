@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends
+# from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException  # <-- add HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Field, Session, create_engine
 from pydantic import BaseModel
@@ -25,18 +26,24 @@ class Patient(SQLModel, table=True):
     email: str
     phone: str
     address: str
+    password: str
+    token: Optional[str] = None
 
 class PatientCreate(BaseModel):
     name: str
     email: str
     phone: str
     address: str
+    password: str
+
+class LoginData(BaseModel):
+    email: str
+    password: str
 
 # ---------- FASTAPI APP ----------
 
 app = FastAPI()
 
-# ✅ Add this block
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Or set specific origins like ["http://localhost:8081"]
@@ -60,6 +67,24 @@ def register_patient(
     session.commit()
     session.refresh(patient)
     return {"patient_id": patient.id, "message": "Patient registered successfully"}
+
+@app.post("/login")
+def login(data: LoginData, session: Session = Depends(get_session)):
+    patient = session.query(Patient).filter(Patient.email == data.email).first()
+    if not patient or patient.password != data.password:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Generate token
+    patient.token = str(uuid.uuid4())
+    session.add(patient)
+    session.commit()
+
+    return {
+        "token": patient.token,
+        "patient_id": patient.id,
+        "name": patient.name
+    }
+
 
 @app.get("/patients")
 def get_all_patients(session: Session = Depends(get_session)):
